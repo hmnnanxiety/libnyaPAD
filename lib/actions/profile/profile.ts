@@ -23,8 +23,8 @@ const updateProfileSchema = z.object({
     .string()
     .regex(/^(\+62|62|0)[8-9][0-9]{7,11}$/, "Format nomor telepon tidak valid")
     .optional()
-    .or(z.literal("")),
-  dosenPembimbingId: z.string().optional(),
+    .or(z.literal("")), // ✅ Allow empty string
+  dosenPembimbingId: z.string().optional().or(z.literal("")), // ✅ Allow empty string
 });
 
 export async function updateProfile(formData: FormData) {
@@ -38,13 +38,18 @@ export async function updateProfile(formData: FormData) {
       };
     }
 
-    const rawData = {
+    // ✅ Only include dosenPembimbingId if it exists in formData
+    const rawData: Record<string, string> = {
       name: formData.get("name") as string,
       nim: formData.get("nim") as string,
       prodi: formData.get("prodi") as string,
       telepon: formData.get("telepon") as string,
-      dosenPembimbingId: formData.get("dosenPembimbingId") as string,
     };
+
+    // ✅ Only add dosenPembimbingId if it's in the form (untuk MAHASISWA)
+    if (formData.has("dosenPembimbingId")) {
+      rawData.dosenPembimbingId = formData.get("dosenPembimbingId") as string;
+    }
 
     const validationResult = updateProfileSchema.safeParse(rawData);
 

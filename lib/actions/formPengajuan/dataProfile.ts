@@ -9,6 +9,7 @@ interface UserProfile {
   nim: string | null;
   prodi: string | null;
   departemen: string | null;
+  dosenPembimbingId: string | null; 
   dosenPembimbing: string | null;
 }
 
@@ -41,8 +42,10 @@ export async function DataProfile() {
         telepon: true,
         email: true,
         departemen: true,
+        dosenPembimbingId: true, 
         dosenPembimbing: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -77,6 +80,7 @@ export async function DataProfile() {
       nim: user.nim,
       prodi: user.prodi,
       departemen: user.departemen,
+      dosenPembimbingId: user.dosenPembimbingId, 
       dosenPembimbing: user.dosenPembimbing ? user.dosenPembimbing.name : null,
     };
 

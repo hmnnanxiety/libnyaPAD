@@ -27,6 +27,49 @@ interface dataAdmin {
   jamSelesai: Date | null;
 }
 
+/**
+ * Update exam status from DIJADWALKAN to SELESAI when exam has passed
+ */
+async function updateExpiredExams() {
+  try {
+    const now = new Date();
+
+    const expiredExams = await prisma.ujian.findMany({
+      where: {
+        status: "DIJADWALKAN",
+        tanggalUjian: {
+          lt: now,
+        },
+      },
+      select: {
+        id: true,
+        jamSelesai: true,
+      },
+    });
+
+    const examsToUpdate = expiredExams.filter((exam) => {
+      if (!exam.jamSelesai) return true;
+      const examEndTime = new Date(exam.jamSelesai);
+      return examEndTime < now;
+    });
+
+    if (examsToUpdate.length > 0) {
+      await prisma.ujian.updateMany({
+        where: {
+          id: {
+            in: examsToUpdate.map((exam) => exam.id),
+          },
+        },
+        data: {
+          status: "SELESAI",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error updating expired exams:", error);
+  }
+}
+
 export async function dashboardTop() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -37,13 +80,16 @@ export async function dashboardTop() {
   }
 
   try {
+    // 🔥 UPDATE EXPIRED EXAMS FIRST
+    await updateExpiredExams();
+
     const userId = session.user.id;
     const role = String(session.user.role || "").toUpperCase();
 
     // Calculate date range: current month and 2 months ahead
     const now = new Date();
     const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of 2 months ahead
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0);
 
     const dateFilter = {
       tanggalUjian: {
@@ -52,6 +98,10 @@ export async function dashboardTop() {
       },
     };
 
+    // Calculate current month range for counting completed exams
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
     switch (role) {
       case "MAHASISWA": {
         // Fetch ujian data
@@ -59,10 +109,15 @@ export async function dashboardTop() {
           where: {
             mahasiswaId: userId,
             ...dateFilter,
+            status: "DIJADWALKAN", // Only show scheduled exams
           },
           select: {
             id: true,
-            ruangan: true,
+            ruangan: {
+              select: {
+                nama: true,
+              },
+            },
             jamMulai: true,
             jamSelesai: true,
           },
@@ -77,7 +132,7 @@ export async function dashboardTop() {
 
         const data: dataMahasiswa[] = ujianData.map((item) => ({
           id: item.id,
-          ruangan: item.ruangan,
+          ruangan: item.ruangan?.nama || null,
           jamMulai: item.jamMulai,
           jamSelesai: item.jamSelesai,
         }));
@@ -97,14 +152,34 @@ export async function dashboardTop() {
               { dosenPenguji: { some: { dosenId: userId } } },
             ],
             ...dateFilter,
+            status: "DIJADWALKAN", // Only show scheduled exams
           },
           select: {
             id: true,
-            ruangan: true,
+            ruangan: {
+              select: {
+                nama: true,
+              },
+            },
             jamMulai: true,
             jamSelesai: true,
           },
           orderBy: { tanggalUjian: "asc" },
+        });
+
+        // Count completed exams this month
+        const ujianSelesaiBulanIni = await prisma.ujian.count({
+          where: {
+            OR: [
+              { dosenPembimbingId: userId },
+              { dosenPenguji: { some: { dosenId: userId } } },
+            ],
+            status: "SELESAI",
+            tanggalUjian: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
         });
 
         const jumlahMahasiswaBimbingan = await prisma.user.count({
@@ -113,7 +188,7 @@ export async function dashboardTop() {
 
         const data: dataDosen[] = ujianData.map((item) => ({
           id: item.id,
-          ruangan: item.ruangan,
+          ruangan: item.ruangan?.nama || null,
           jamMulai: item.jamMulai,
           jamSelesai: item.jamSelesai,
         }));
@@ -122,12 +197,16 @@ export async function dashboardTop() {
           success: true,
           data,
           jumlahMahasiswaBimbingan,
+          ujianSelesaiBulanIni,
         };
       }
 
       case "ADMIN": {
         const ujianData = await prisma.ujian.findMany({
-          where: dateFilter,
+          where: {
+            ...dateFilter,
+            status: "DIJADWALKAN", // Only show scheduled exams
+          },
           select: {
             id: true,
             mahasiswa: {
@@ -137,11 +216,26 @@ export async function dashboardTop() {
                 image: true,
               },
             },
-            ruangan: true,
+            ruangan: {
+              select: {
+                nama: true,
+              },
+            },
             jamMulai: true,
             jamSelesai: true,
           },
           orderBy: { tanggalUjian: "asc" },
+        });
+
+        // Count completed exams this month
+        const ujianSelesaiBulanIni = await prisma.ujian.count({
+          where: {
+            status: "SELESAI",
+            tanggalUjian: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
         });
 
         const [jumlahMahasiswa, jumlahDosen] = await Promise.all([
@@ -154,7 +248,7 @@ export async function dashboardTop() {
           namaMahasiswa: item.mahasiswa?.name || null,
           nim: item.mahasiswa?.nim || null,
           foto: item.mahasiswa?.image || null,
-          ruangan: item.ruangan,
+          ruangan: item.ruangan?.nama || null,
           jamMulai: item.jamMulai,
           jamSelesai: item.jamSelesai,
         }));
@@ -164,6 +258,7 @@ export async function dashboardTop() {
           data,
           jumlahMahasiswa,
           jumlahDosen,
+          ujianSelesaiBulanIni,
         };
       }
 

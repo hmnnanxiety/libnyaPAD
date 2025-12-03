@@ -25,6 +25,7 @@ const updateMahasiswaProfileSchema = z.object({
     .optional()
     .or(z.literal("")),
   dosenPembimbingId: z.string().optional(),
+  role: z.enum(["MAHASISWA", "DOSEN"])
 });
 
 export async function updateMahasiswaProfileByAdmin(
@@ -48,6 +49,7 @@ export async function updateMahasiswaProfileByAdmin(
       prodi: formData.get("prodi") as string,
       telepon: formData.get("telepon") as string,
       dosenPembimbingId: formData.get("dosenPembimbingId") as string,
+      role: formData.get("role") as string,
     };
 
     const validationResult = updateMahasiswaProfileSchema.safeParse(rawData);
@@ -84,6 +86,7 @@ export async function updateMahasiswaProfileByAdmin(
         telepon: data.telepon || null,
         dosenPembimbingId: data.dosenPembimbingId || null,
         updatedAt: new Date(),
+        role: data.role || "MAHASISWA",
       },
     });
 

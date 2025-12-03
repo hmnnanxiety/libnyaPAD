@@ -43,6 +43,7 @@ export async function manajemenPengajuanFormPendaftaran(
     const { page = 1, limit = 10, status } = params;
     const skip = (page - 1) * limit;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const whereClause: any = {};
     if (status) {
       whereClause.status = status;

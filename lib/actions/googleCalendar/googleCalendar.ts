@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma";
 function convertToJakartaTime(utcDateString: string): string {
   const date = new Date(utcDateString);
 
+  // Convert UTC to Jakarta time (UTC+7)
+  date.setUTCHours(date.getUTCHours() + 7);
+
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
@@ -448,94 +451,6 @@ export async function checkCalendarAccess() {
     return {
       hasAccess: false,
       error: "Failed to check calendar access",
-    };
-  }
-}
-
-// Fetch calendar events within a specified time range
-export async function getCalendarEvents(
-  timeMin?: string,
-  timeMax?: string
-) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "You must be logged in to view calendar events",
-      };
-    }
-
-    const userId = session.user.id;
-    const accessToken = await getValidAccessToken(userId);
-
-    const oauth2Client = getOAuth2Client();
-    oauth2Client.setCredentials({
-      access_token: accessToken,
-    });
-
-    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
-
-    // Default: get events from start of current month to end of next 2 months
-    const now = new Date();
-    const defaultTimeMin = timeMin || new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const defaultTimeMax = timeMax || new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString();
-
-    const response = await calendar.events.list({
-      calendarId: "primary",
-      timeMin: defaultTimeMin,
-      timeMax: defaultTimeMax,
-      singleEvents: true,
-      orderBy: "startTime",
-      maxResults: 50,
-    });
-
-    const events = response.data.items || [];
-
-    return {
-      success: true,
-      events: events.map((event) => ({
-        id: event.id || "",
-        summary: event.summary || "Untitled Event",
-        description: event.description || undefined,
-        location: event.location || null,
-        start: event.start?.dateTime || event.start?.date || "",
-        end: event.end?.dateTime || event.end?.date || "",
-        htmlLink: event.htmlLink || "",
-        attendees: event.attendees?.map((a) => a.email).filter(Boolean) || [],
-      })),
-      message: "Events fetched successfully",
-    };
-  } catch (error: unknown) {
-    console.error("Error fetching calendar events:", error);
-    if (error instanceof Error) {
-      if (error.message.includes("REAUTH_REQUIRED")) {
-        return {
-          success: false,
-          error: error.message.replace("REAUTH_REQUIRED: ", ""),
-          needsReauth: true,
-        };
-      }
-      if (
-        error.message.includes("invalid authentication credentials") ||
-        error.message.includes("Invalid Credentials") ||
-        error.message.includes("unauthorized")
-      ) {
-        return {
-          success: false,
-          error:
-            "Your Google Calendar access has expired. Please sign out and sign in again.",
-          needsReauth: true,
-        };
-      }
-      return {
-        success: false,
-        error: error.message || "Failed to fetch calendar events",
-      };
-    }
-    return {
-      success: false,
-      error: "An unknown error occurred",
     };
   }
 }

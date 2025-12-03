@@ -7,7 +7,6 @@ import { z } from "zod";
 import {
   createCalendarEvent,
   updateCalendarEvent,
-  deleteCalendarEvent,
 } from "../googleCalendar/googleCalendar";
 import { createMultipleNotifications } from "../notifikasi/notifications";
 import { formatNotificationMessage } from "@/lib/utils/notificationHelpers";
@@ -54,7 +53,7 @@ const assignUjianSchema = z.object({
   tanggalUjian: z.string().min(1, "Tanggal ujian wajib diisi"),
   jamMulai: z.string().min(1, "Jam mulai wajib diisi"),
   jamSelesai: z.string().min(1, "Jam selesai wajib diisi"),
-  ruangan: z.string().min(1, "Ruangan wajib diisi"),
+  ruanganId: z.string().min(1, "Ruangan wajib dipilih"),
 });
 
 export async function getUjianDetails(ujianId: string) {
@@ -165,10 +164,10 @@ export async function getAvailableDosen(
     const [endHour, endMinute] = jamSelesai.split(":").map(Number);
 
     const startTime = new Date(selectedDate);
-    startTime.setHours(startHour, startMinute, 0, 0);
+    startTime.setUTCHours(startHour - 7, startMinute, 0, 0);
 
     const endTime = new Date(selectedDate);
-    endTime.setHours(endHour, endMinute, 0, 0);
+    endTime.setUTCHours(endHour - 7, endMinute, 0, 0);
 
     if (endTime <= startTime) {
       return {
@@ -188,8 +187,24 @@ export async function getAvailableDosen(
     const conflictingExams = await prisma.ujian.findMany({
       where: {
         tanggalUjian: {
-          gte: new Date(selectedDate.setHours(0, 0, 0, 0)),
-          lt: new Date(selectedDate.setHours(23, 59, 59, 999)),
+          gte: new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            0,
+            0,
+            0,
+            0
+          ),
+          lt: new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            23,
+            59,
+            59,
+            999
+          ),
         },
         status: "DIJADWALKAN",
         jamMulai: { not: null },
@@ -257,6 +272,173 @@ export async function getAvailableDosen(
   }
 }
 
+export async function getAllRuangan() {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return {
+        success: false,
+        error: "Akses ditolak",
+      };
+    }
+
+    const ruangan = await prisma.ruangan.findMany({
+      select: {
+        id: true,
+        nama: true,
+        deskripsi: true,
+      },
+      orderBy: {
+        nama: "asc",
+      },
+    });
+
+    return {
+      success: true,
+      data: ruangan,
+    };
+  } catch (error) {
+    console.error("Error getting all ruangan:", error);
+    return {
+      success: false,
+      error: "Terjadi kesalahan saat mengambil data ruangan",
+    };
+  }
+}
+
+export async function getAvailableRuangan(
+  tanggalUjian: string,
+  jamMulai: string,
+  jamSelesai: string,
+  excludeUjianId?: string
+) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return {
+        success: false,
+        error: "Akses ditolak",
+      };
+    }
+
+    const selectedDate = new Date(tanggalUjian);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      return {
+        success: false,
+        error: "Tidak dapat menjadwalkan ujian pada tanggal yang sudah lewat",
+      };
+    }
+
+    const [startHour, startMinute] = jamMulai.split(":").map(Number);
+    const [endHour, endMinute] = jamSelesai.split(":").map(Number);
+
+    const startTime = new Date(selectedDate);
+    startTime.setUTCHours(startHour - 7, startMinute, 0, 0);
+
+    const endTime = new Date(selectedDate);
+    endTime.setUTCHours(endHour - 7, endMinute, 0, 0);
+
+    if (endTime <= startTime) {
+      return {
+        success: false,
+        error: "Jam selesai harus lebih besar dari jam mulai",
+      };
+    }
+
+    const allRuangan = await prisma.ruangan.findMany({
+      select: {
+        id: true,
+        nama: true,
+        deskripsi: true,
+      },
+      orderBy: {
+        nama: "asc",
+      },
+    });
+
+    const conflictingExams = await prisma.ujian.findMany({
+      where: {
+        tanggalUjian: {
+          gte: new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            0,
+            0,
+            0,
+            0
+          ),
+          lt: new Date(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            23,
+            59,
+            59,
+            999
+          ),
+        },
+        status: "DIJADWALKAN",
+        jamMulai: { not: null },
+        jamSelesai: { not: null },
+        ruanganId: { not: null },
+        ...(excludeUjianId && { id: { not: excludeUjianId } }),
+      },
+      select: {
+        id: true,
+        jamMulai: true,
+        jamSelesai: true,
+        ruanganId: true,
+      },
+    });
+
+    const hasTimeOverlap = (
+      exam1Start: Date,
+      exam1End: Date,
+      exam2Start: Date,
+      exam2End: Date
+    ) => {
+      return exam1Start < exam2End && exam2Start < exam1End;
+    };
+
+    const busyRuanganIds = new Set<string>();
+
+    conflictingExams.forEach((exam) => {
+      if (exam.jamMulai && exam.jamSelesai && exam.ruanganId) {
+        const examStart = new Date(exam.jamMulai);
+        const examEnd = new Date(exam.jamSelesai);
+
+        if (hasTimeOverlap(startTime, endTime, examStart, examEnd)) {
+          busyRuanganIds.add(exam.ruanganId);
+        }
+      }
+    });
+
+    const availableRuangan = allRuangan.filter(
+      (ruangan) => !busyRuanganIds.has(ruangan.id)
+    );
+
+    return {
+      success: true,
+      data: {
+        available: availableRuangan,
+        busy: allRuangan.filter((ruangan) => busyRuanganIds.has(ruangan.id)),
+      },
+    };
+  } catch (error) {
+    console.error("Error getting available ruangan:", error);
+    return {
+      success: false,
+      error: "Terjadi kesalahan saat mengambil data ruangan",
+    };
+  }
+}
+
 export async function assignUjian(formData: FormData) {
   try {
     const session = await auth();
@@ -282,7 +464,7 @@ export async function assignUjian(formData: FormData) {
       tanggalUjian: formData.get("tanggalUjian") as string,
       jamMulai: formData.get("jamMulai") as string,
       jamSelesai: formData.get("jamSelesai") as string,
-      ruangan: formData.get("ruangan") as string,
+      ruanganId: formData.get("ruanganId") as string,
     };
 
     const validationResult = assignUjianSchema.safeParse(rawData);
@@ -356,17 +538,13 @@ export async function assignUjian(formData: FormData) {
     const [jamSelesaiHour, jamSelesaiMinute] = data.jamSelesai.split(":");
 
     const jamMulai = new Date(tanggalUjian);
-    jamMulai.setHours(parseInt(jamMulaiHour), parseInt(jamMulaiMinute));
+    jamMulai.setUTCHours(parseInt(jamMulaiHour) - 7, parseInt(jamMulaiMinute));
 
     const jamSelesai = new Date(tanggalUjian);
-    jamSelesai.setHours(parseInt(jamSelesaiHour), parseInt(jamSelesaiMinute));
-
-    if (jamSelesai <= jamMulai) {
-      return {
-        success: false,
-        error: "Jam selesai harus lebih besar dari jam mulai",
-      };
-    }
+    jamSelesai.setUTCHours(
+      parseInt(jamSelesaiHour) - 7,
+      parseInt(jamSelesaiMinute)
+    );
 
     const availabilityCheck = await getAvailableDosen(
       data.tanggalUjian,
@@ -382,8 +560,28 @@ export async function assignUjian(formData: FormData) {
       };
     }
 
+    const ruanganAvailabilityCheck = await getAvailableRuangan(
+      data.tanggalUjian,
+      data.jamMulai,
+      data.jamSelesai,
+      data.ujianId
+    );
+
+    if (!ruanganAvailabilityCheck.success) {
+      return {
+        success: false,
+        error:
+          ruanganAvailabilityCheck.error ||
+          "Gagal memeriksa ketersediaan ruangan",
+      };
+    }
+
     const availableDosenIds = new Set(
       availabilityCheck.data?.available.map((d) => d.id) || []
+    );
+
+    const availableRuanganIds = new Set(
+      ruanganAvailabilityCheck.data?.available.map((r) => r.id) || []
     );
 
     if (!availableDosenIds.has(ujian.dosenPembimbingId)) {
@@ -412,6 +610,29 @@ export async function assignUjian(formData: FormData) {
       return {
         success: false,
         error: `Dosen penguji 2 (${dosenPenguji2?.name}) sudah memiliki jadwal ujian pada waktu tersebut`,
+      };
+    }
+
+    if (!availableRuanganIds.has(data.ruanganId)) {
+      const ruangan = await prisma.ruangan.findUnique({
+        where: { id: data.ruanganId },
+        select: { nama: true },
+      });
+      return {
+        success: false,
+        error: `Ruangan ${ruangan?.nama} sudah digunakan untuk ujian lain pada waktu tersebut`,
+      };
+    }
+
+    const ruangan = await prisma.ruangan.findUnique({
+      where: { id: data.ruanganId },
+      select: { nama: true },
+    });
+
+    if (!ruangan) {
+      return {
+        success: false,
+        error: "Ruangan tidak ditemukan",
       };
     }
 
@@ -450,7 +671,7 @@ export async function assignUjian(formData: FormData) {
     }
 
     const description = `SIMPENSI - ${ujian.judul} - ${
-      data.ruangan
+      ruangan.nama
     } - Pembimbing: ${ujian.dosenPembimbing.name || "N/A"} / Penguji: ${
       dosenPenguji1.name || "N/A"
     }, ${dosenPenguji2.name || "N/A"}`;
@@ -464,7 +685,7 @@ export async function assignUjian(formData: FormData) {
         calendarResult = await updateCalendarEvent(calendarEventId, {
           summary: `Ujian TA - ${ujian.mahasiswa.name}`,
           description: description,
-          location: data.ruangan,
+          location: ruangan.nama,
           startDateTime: jamMulai.toISOString(),
           endDateTime: jamSelesai.toISOString(),
           attendees: attendeeEmails,
@@ -473,7 +694,7 @@ export async function assignUjian(formData: FormData) {
         calendarResult = await createCalendarEvent({
           summary: `Ujian TA - ${ujian.mahasiswa.name}`,
           description: description,
-          location: data.ruangan,
+          location: ruangan.nama,
           startDateTime: jamMulai.toISOString(),
           endDateTime: jamSelesai.toISOString(),
           attendees: attendeeEmails,
@@ -513,7 +734,7 @@ export async function assignUjian(formData: FormData) {
           tanggalUjian: tanggalUjian,
           jamMulai: jamMulai,
           jamSelesai: jamSelesai,
-          ruangan: data.ruangan,
+          ruanganId: data.ruanganId,
           googleCalendarEventId: calendarEventId,
           updatedAt: new Date(),
         },
