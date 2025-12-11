@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { StatusUjian } from "@/generated/prisma";
+import { StatusUjian, Prisma } from "@/generated/prisma";
 
 interface dosenRU {
   id: string;
@@ -89,7 +89,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
     const userId = session.user.id;
     const role = session.user.role.toUpperCase();
 
-    const dateFilter: any = {};
+    const dateFilter: Partial<Pick<Prisma.UjianWhereInput, 'tanggalUjian'>> = {};
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
@@ -105,7 +105,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
     //       DOSEN
     // ====================
     if (role === "DOSEN") {
-      let whereClause: any = {
+      let whereClause: Prisma.UjianWhereInput = {
         OR: [
           { dosenPembimbingId: userId },
           { dosenPenguji: { some: { dosenId: userId } } },
@@ -164,7 +164,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
     //        ADMIN
     // ====================
     if (role === "ADMIN") {
-      const whereClause = {
+      const whereClause: Prisma.UjianWhereInput = {
         status: StatusUjian.SELESAI,
         ...dateFilter,
       };

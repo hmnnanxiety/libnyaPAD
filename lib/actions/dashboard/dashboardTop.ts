@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-interface dataDosen {
+interface dosenRU {
   id: string;
   ruangan: string | null;
   jamMulai: Date | null;
@@ -27,49 +27,6 @@ interface dataAdmin {
   jamSelesai: Date | null;
 }
 
-/**
- * Update exam status from DIJADWALKAN to SELESAI when exam has passed
- */
-async function updateExpiredExams() {
-  try {
-    const now = new Date();
-
-    const expiredExams = await prisma.ujian.findMany({
-      where: {
-        status: "DIJADWALKAN",
-        tanggalUjian: {
-          lt: now,
-        },
-      },
-      select: {
-        id: true,
-        jamSelesai: true,
-      },
-    });
-
-    const examsToUpdate = expiredExams.filter((exam) => {
-      if (!exam.jamSelesai) return true;
-      const examEndTime = new Date(exam.jamSelesai);
-      return examEndTime < now;
-    });
-
-    if (examsToUpdate.length > 0) {
-      await prisma.ujian.updateMany({
-        where: {
-          id: {
-            in: examsToUpdate.map((exam) => exam.id),
-          },
-        },
-        data: {
-          status: "SELESAI",
-        },
-      });
-    }
-  } catch (error) {
-    console.error("Error updating expired exams:", error);
-  }
-}
-
 export async function dashboardTop() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -80,36 +37,25 @@ export async function dashboardTop() {
   }
 
   try {
-    // 🔥 UPDATE EXPIRED EXAMS FIRST
-    await updateExpiredExams();
-
     const userId = session.user.id;
     const role = String(session.user.role || "").toUpperCase();
 
     // Calculate date range: current month and 2 months ahead
     const now = new Date();
     const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0);
-
-    const dateFilter = {
-      tanggalUjian: {
-        gte: startOfCurrentMonth,
-        lte: endDate,
-      },
-    };
-
-    // Calculate current month range for counting completed exams
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of 2 months ahead
 
     switch (role) {
       case "MAHASISWA": {
-        // Fetch ujian data
+        // Fetch ujian data - only upcoming (not finished yet)
         const ujianData = await prisma.ujian.findMany({
           where: {
             mahasiswaId: userId,
-            ...dateFilter,
-            status: "DIJADWALKAN", // Only show scheduled exams
+            tanggalUjian: {
+              gte: startOfCurrentMonth,
+              lte: endDate,
+            },
+            status: "DIJADWALKAN",
           },
           select: {
             id: true,
@@ -124,13 +70,30 @@ export async function dashboardTop() {
           orderBy: { tanggalUjian: "asc" },
         });
 
+        // Filter out completed exams
+        const upcomingData = ujianData.filter(item => {
+          if (!item.jamSelesai) return true;
+          return new Date(item.jamSelesai) >= now;
+        });
+
         const latestUjian = await prisma.ujian.findFirst({
           where: { mahasiswaId: userId },
-          select: { status: true },
+          select: { 
+            status: true,
+            jamSelesai: true,
+          },
           orderBy: { createdAt: "desc" },
         });
 
-        const data: dataMahasiswa[] = ujianData.map((item) => ({
+        // Compute display status
+        let displayStatus = latestUjian?.status || null;
+        if (latestUjian?.jamSelesai && new Date(latestUjian.jamSelesai) < now) {
+          if (latestUjian.status === "DIJADWALKAN") {
+            displayStatus = "SELESAI";
+          }
+        }
+
+        const data: dataMahasiswa[] = upcomingData.map((item) => ({
           id: item.id,
           ruangan: item.ruangan?.nama || null,
           jamMulai: item.jamMulai,
@@ -140,19 +103,23 @@ export async function dashboardTop() {
         return {
           success: true,
           data,
-          statusPengajuan: latestUjian?.status || null,
+          statusPengajuan: displayStatus,
         };
       }
 
       case "DOSEN": {
+        // Fetch upcoming exams for dosen
         const ujianData = await prisma.ujian.findMany({
           where: {
             OR: [
               { dosenPembimbingId: userId },
               { dosenPenguji: { some: { dosenId: userId } } },
             ],
-            ...dateFilter,
-            status: "DIJADWALKAN", // Only show scheduled exams
+            tanggalUjian: {
+              gte: startOfCurrentMonth,
+              lte: endDate,
+            },
+            status: "DIJADWALKAN",
           },
           select: {
             id: true,
@@ -167,26 +134,49 @@ export async function dashboardTop() {
           orderBy: { tanggalUjian: "asc" },
         });
 
-        // Count completed exams this month
-        const ujianSelesaiBulanIni = await prisma.ujian.count({
+        // Filter out completed exams
+        const upcomingData = ujianData.filter(item => {
+          if (!item.jamSelesai) return true;
+          return new Date(item.jamSelesai) >= now;
+        });
+
+        // Count completed exams this month - FIXED
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        
+        // Fetch all DIJADWALKAN exams this month and filter in memory
+        const allUjianThisMonth = await prisma.ujian.findMany({
           where: {
             OR: [
               { dosenPembimbingId: userId },
               { dosenPenguji: { some: { dosenId: userId } } },
             ],
-            status: "SELESAI",
+            status: "DIJADWALKAN",
             tanggalUjian: {
               gte: startOfMonth,
               lte: endOfMonth,
             },
           },
+          select: {
+            jamSelesai: true,
+          },
         });
 
+        // Count those where jamSelesai has passed
+        const ujianSelesaiBulanIni = allUjianThisMonth.filter(ujian => {
+          if (!ujian.jamSelesai) return false;
+          return new Date(ujian.jamSelesai) < now;
+        }).length;
+
+        // Count mahasiswa bimbingan - semua mahasiswa yang sedang dibimbing
         const jumlahMahasiswaBimbingan = await prisma.user.count({
-          where: { dosenPembimbingId: userId },
+          where: { 
+            dosenPembimbingId: userId,
+            role: "MAHASISWA"
+          },
         });
 
-        const data: dataDosen[] = ujianData.map((item) => ({
+        const data: dosenRU[] = upcomingData.map((item) => ({
           id: item.id,
           ruangan: item.ruangan?.nama || null,
           jamMulai: item.jamMulai,
@@ -202,10 +192,14 @@ export async function dashboardTop() {
       }
 
       case "ADMIN": {
+        // Fetch upcoming exams
         const ujianData = await prisma.ujian.findMany({
           where: {
-            ...dateFilter,
-            status: "DIJADWALKAN", // Only show scheduled exams
+            tanggalUjian: {
+              gte: startOfCurrentMonth,
+              lte: endDate,
+            },
+            status: "DIJADWALKAN",
           },
           select: {
             id: true,
@@ -227,23 +221,43 @@ export async function dashboardTop() {
           orderBy: { tanggalUjian: "asc" },
         });
 
-        // Count completed exams this month
-        const ujianSelesaiBulanIni = await prisma.ujian.count({
+        // Filter out completed exams
+        const upcomingData = ujianData.filter(item => {
+          if (!item.jamSelesai) return true;
+          return new Date(item.jamSelesai) >= now;
+        });
+
+        // Count completed exams this month - FIXED
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        
+        // Fetch all DIJADWALKAN exams this month and filter in memory
+        const allUjianThisMonth = await prisma.ujian.findMany({
           where: {
-            status: "SELESAI",
+            status: "DIJADWALKAN",
             tanggalUjian: {
               gte: startOfMonth,
               lte: endOfMonth,
             },
           },
+          select: {
+            jamSelesai: true,
+          },
         });
 
+        // Count those where jamSelesai has passed
+        const ujianSelesaiBulanIni = allUjianThisMonth.filter(ujian => {
+          if (!ujian.jamSelesai) return false;
+          return new Date(ujian.jamSelesai) < now;
+        }).length;
+
+        // Count active mahasiswa and dosen
         const [jumlahMahasiswa, jumlahDosen] = await Promise.all([
           prisma.user.count({ where: { role: "MAHASISWA" } }),
           prisma.user.count({ where: { role: "DOSEN" } }),
         ]);
 
-        const data: dataAdmin[] = ujianData.map((item) => ({
+        const data: dataAdmin[] = upcomingData.map((item) => ({
           id: item.id,
           namaMahasiswa: item.mahasiswa?.name || null,
           nim: item.mahasiswa?.nim || null,
