@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+  output = "../ERD.svg"
+}
+
+// datasource db {
+//   provider = "sqlite"
+//   url      = env("DATABASE_URL")
+// }
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- ENUMS ---
+enum Role {
+  MAHASISWA
+  DOSEN
+  ADMIN
+}
+
+enum StatusUjian {
+  MENUNGGU_VERIFIKASI
+  DITERIMA
+  DITOLAK
+  DIJADWALKAN
+  SELESAI
+}
+
+enum Prodi {
+  TeknologiRekayasaPerangkatLunak
+  TeknologiRekayasaElektro
+  TeknologiRekayasaInternet
+  TeknologiRekayasaInstrumentasiDanKontrol
+}
+
+
+// --- MODELS ---
+
+model User {
+  id                   String              @id @default(cuid())
+  name                 String?
+  email                String?             @unique
+  emailVerified        DateTime?
+  image                String?
+  role                 Role                @default(MAHASISWA)
+  nim                  String?             @unique
+  prodi                Prodi?
+  departemen           String?             @default("Departemen Teknik Elektro dan Informatika")
+  telepon              String?
+  dosenPembimbingId    String?
+  dosenPembimbing      User?               @relation("Bimbingan", fields: [dosenPembimbingId], references: [id])
+  mahasiswaBimbingan   User[]              @relation("Bimbingan")
+  accounts             Account[]
+  sessions             Session[]
+  ujianMahasiswa       Ujian[]             @relation("UjianMahasiswa")
+  ujianDosenPembimbing Ujian[]             @relation("UjianDosenPembimbing")
+  ujianDosenPenguji    UjianDosenPenguji[]
+  notifications        Notification[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+// REFINED: Model Ujian is now unified to hold all information
+model Ujian {
+  id                String            @id @default(cuid())
+
+  // --- Data Pengajuan (from Mahasiswa) ---
+  judul             String
+  berkasUrl         String
+  createdAt         DateTime          @default(now()) // "Tanggal Diajukan"
+  mahasiswaId       String
+  mahasiswa         User              @relation("UjianMahasiswa", fields: [mahasiswaId], references: [id])
+  dosenPembimbingId String
+  dosenPembimbing   User              @relation("UjianDosenPembimbing", fields: [dosenPembimbingId], references: [id])
+  dosenPenguji      UjianDosenPenguji[]
+
+  // --- Data Penjadwalan (from Admin) ---
+  status            StatusUjian       @default(MENUNGGU_VERIFIKASI)
+  komentarAdmin     String?           // For rejection comments
+  tanggalUjian      DateTime?         // The date of the exam
+  jamMulai          DateTime?         // Start date and time
+  jamSelesai        DateTime?         // End date and time
+  ruanganId         String?
+  ruangan           Ruangan?          @relation(fields: [ruanganId], references: [id])
+  googleCalendarEventId String?       // To update/delete the GCal event
+
+  // --- Data Berita Acara (Post-Ujian) ---
+  catatanBeritaAcara String?
+  fileUrlBeritaAcara String?
+  
+  // --- Relations ---
+  notifications     Notification[]
+  
+  updatedAt         DateTime          @updatedAt
+}
+
+// Model join untuk Dosen Penguji tetap sama
+model UjianDosenPenguji {
+  ujianId String
+  dosenId String
+  ujian   Ujian  @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  dosen   User   @relation(fields: [dosenId], references: [id])
+  assignedAt DateTime @default(now())
+  @@id([ujianId, dosenId])
+}
+
+// Model untuk Notification
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   // Who receives this notification
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ujianId   String   // Related exam
+  ujian     Ujian    @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  message   String   // Notification message
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([ujianId])
+}
+
+
+// Model untuk Ruangan
+model Ruangan {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  deskripsi String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ujian Ujian[]
+}
+
+// --- AUTH.JS MODELS ---
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
