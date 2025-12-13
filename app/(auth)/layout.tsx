@@ -1,3 +1,5 @@
+// src\app\(auth)\layout.tsx
+
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar";
@@ -13,35 +15,41 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
-  if (status === "loading") {
-    return null;
-  }
 
-  if (!session) {
-    return null;
+  // Tampilkan loading state saat checking session
+  if (status === "loading") {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
+          <p className="text-sm text-gray-600">Memuat...</p>
+        </div>
+      </div>
+    );
   }
+  
   const user = {
-    name: session.user?.name || "User",
-    email: session.user?.email || "",
-    avatar: session.user?.image || "",
+    name: session?.user?.name || "User",
+    email: session?.user?.email || "",
+    avatar: session?.user?.image || "",
   };
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
+        {/* Mobile trigger button - hanya tampil di mobile */}
+        <div className="md:hidden sticky top-0 z-10 bg-background border-b">
+          <div className="flex items-center gap-2 px-4 py-3">
             <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
+            <h1 className="text-lg font-semibold">SIMPENSI</h1>
           </div>
-          <div className="ml-auto px-4">
-            <NavUser user={user} />
-          </div>
-        </header>
-        {children}
+        </div>
+        
+        {/* Main content - tanpa navbar */}
+        <main className="flex-1">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

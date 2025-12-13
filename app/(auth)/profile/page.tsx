@@ -7,7 +7,6 @@ import { ProfileClient } from "@/components/profile/p-client";
 export default async function ProfilePage() {
   const session = await auth();
 
-  // Check authentication
   if (!session?.user) {
     redirect("/login");
   }

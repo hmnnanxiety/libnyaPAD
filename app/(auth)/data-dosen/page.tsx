@@ -6,12 +6,20 @@ import { DosenClient } from "@/components/data-dosen/dd-client";
 export default async function DataDosenPage() {
   const session = await auth();
 
-  if (!session?.user?.id) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  if (session.user.role !== "ADMIN") {
-    redirect("/dashboard");
+  const allowedRoles = ["ADMIN"];
+  if (!allowedRoles.includes(session.user.role || "")) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      </div>
+    );
   }
 
   const dosen = await prisma.user.findMany({

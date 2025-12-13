@@ -5,7 +5,7 @@ import DJClient from "@/components/detail-jadwal/dj-client";
 export default async function DetailJadwalPage() {
   const session = await auth();
   
-  if (!session?.user?.id) {
+  if (!session?.user) {
     redirect("/login");
   }
 
@@ -16,9 +16,16 @@ export default async function DetailJadwalPage() {
     redirect("/daftar-penjadwalan");
   }
 
-  // Hanya dosen dan mahasiswa yang bisa akses
-  if (role !== "DOSEN" && role !== "MAHASISWA") {
-    redirect("/dashboard");
+  const allowedRoles = ["DOSEN", "MAHASISWA"];
+  if (!allowedRoles.includes(role)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

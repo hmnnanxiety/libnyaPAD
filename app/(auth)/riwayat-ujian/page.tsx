@@ -1,3 +1,5 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { riwayatUjian } from "@/lib/actions/riwayatUjian/riwayatUjian";
 import { RiwayatUjianClient } from "@/components/riwayat-ujian/ru-client";
 
@@ -19,7 +21,24 @@ interface DosenRU {
 }
 
 export default async function RiwayatUjianPage({ searchParams }: PageProps) {
-  // Await searchParams before using it
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const allowedRoles = ["DOSEN"];
+  if (!allowedRoles.includes(session.user.role || "")) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-600">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      </div>
+    );
+  }
+
   const params = await searchParams;
   const page = Number(params.page) || 1;
 
