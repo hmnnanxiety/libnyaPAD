@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,12 +15,17 @@ import {
 import { LogIn, Shield, BookOpen, Users, Loader2 } from "lucide-react";
 
 export function LoginPage() {
+  const searchParams = useSearchParams(); // ✅ TAMBAH INI
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"; // ✅ TAMBAH INI
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("google", { 
+        callbackUrl: callbackUrl, // ✅ UBAH INI (tadinya hardcoded "/dashboard")
+        redirect: true 
+      });
     } catch (error) {
       console.error("Sign in error:", error);
       setIsLoading(false);

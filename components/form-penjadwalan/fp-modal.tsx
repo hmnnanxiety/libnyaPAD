@@ -538,7 +538,7 @@ export function PenjadwalanModal({
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-gray-700 uppercase tracking-wide">
-                      Pembimbing 1
+                      Dosen Pembimbing 
                     </Label>
                     <Input
                       value={data?.dosenPembimbing.name || ""}
@@ -552,7 +552,7 @@ export function PenjadwalanModal({
                       htmlFor="dosenPenguji1"
                       className="text-xs font-medium text-gray-700 uppercase tracking-wide"
                     >
-                      Pembimbing 2
+                      Penguji 1
                       {isCheckingAvailability && (
                         <span className="ml-2 text-xs font-normal text-blue-600 normal-case">
                           (Memeriksa...)
@@ -567,7 +567,7 @@ export function PenjadwalanModal({
                       disabled={isProcessing || isCheckingAvailability}
                     >
                       <SelectTrigger id="dosenPenguji1" className="h-11">
-                        <SelectValue placeholder="Pilih Pembimbing 2" />
+                        <SelectValue placeholder="Pilih Penguji 1" />
                       </SelectTrigger>
                       <SelectContent>
                         {availableDosen
@@ -595,7 +595,7 @@ export function PenjadwalanModal({
                       htmlFor="dosenPenguji2"
                       className="text-xs font-medium text-gray-700 uppercase tracking-wide"
                     >
-                      Penguji
+                      Penguji 2
                       {isCheckingAvailability && (
                         <span className="ml-2 text-xs font-normal text-blue-600 normal-case">
                           (Memeriksa...)
@@ -635,7 +635,7 @@ export function PenjadwalanModal({
                 </div>
               </div>
 
-              {/* Catatan */}
+              {/* Catatan
               <div className="space-y-2">
                 <Label htmlFor="catatan" className="text-xs font-medium text-gray-700 uppercase tracking-wide">
                   Catatan (Opsional)
@@ -649,7 +649,7 @@ export function PenjadwalanModal({
                   disabled={isProcessing}
                   className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Action Buttons - Fixed at bottom */}

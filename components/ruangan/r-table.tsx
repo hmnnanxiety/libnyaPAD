@@ -116,7 +116,7 @@ export function RuanganTable({
     <div className="space-y-4">
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <Table>
-          <TableHeader className="bg-gray-50">
+          <TableHeader className="bg-blue-50">
             <TableRow>
               <TableHead className="px-6 py-4 text-sm font-semibold text-gray-700">
                 Nama Ruangan

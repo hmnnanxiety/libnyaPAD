@@ -5,18 +5,18 @@ import {
   Users,
   Calendar,
   CheckCircle,
-  Clock,
   GraduationCap,
-  MapPin,
 } from "lucide-react";
 
 interface TopData {
   jumlahMahasiswa?: number;
   jumlahDosen?: number;
-  data?: Array<{ ruangan?: string }>;
+  data?: Array<{ 
+    ruangan?: string | null;
+    jamSelesai?: Date | null;
+  }>;
   ujianSelesaiBulanIni?: number;
   jumlahMahasiswaBimbingan?: number;
-  jadwalDitunda?: number;
   statusPengajuan?: string;
 }
 
@@ -106,7 +106,7 @@ function AdminTopSection({ topData }: { topData: TopData }) {
   );
 }
 
-// Dosen Statistics - 4 cards with better responsive grid
+// Dosen Statistics - 3 cards with better responsive grid
 function DosenTopSection({ topData }: { topData: TopData }) {
   const stats = [
     {
@@ -133,18 +133,10 @@ function DosenTopSection({ topData }: { topData: TopData }) {
       bgColor: "bg-orange-50",
       borderColor: "border-orange-100",
     },
-    {
-      label: "Jadwal Ujian Ditunda",
-      value: topData?.jadwalDitunda || 0,
-      icon: Clock,
-      color: "text-pink-600",
-      bgColor: "bg-pink-50",
-      borderColor: "border-pink-100",
-    },
   ];
 
   return (
-    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-4">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
@@ -289,7 +281,7 @@ function MahasiswaTopSection({ topData }: { topData: TopData }) {
                 ruangIsScheduled ? "bg-blue-100" : "bg-gray-100"
               }`}
             >
-              <MapPin
+              <CheckCircle
                 className={`h-5 w-5 sm:h-6 sm:w-6 ${
                   ruangIsScheduled ? "text-blue-600" : "text-gray-500"
                 }`}

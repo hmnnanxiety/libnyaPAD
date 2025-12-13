@@ -264,7 +264,7 @@ export function CalendarFull({ upcomingExams, role, onEventClick }: CalendarFull
                           {formatTime(exam.jamSelesai)}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Ruangan {exam.ruangan || "-"}
+                          Ruangan {typeof exam.ruangan === 'string' ? exam.ruangan : exam.ruangan || "-"}
                         </p>
                       </div>
                     </div>

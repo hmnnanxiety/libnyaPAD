@@ -34,7 +34,7 @@ interface DosenExamItem {
   namaMahasiswa: string | null;
   nim: string | null;
   foto: string | null;
-  judulTugasAkhir: string | null;
+  judul: string | null;
   tanggal: Date | null;
   jamMulai: Date | null;
   jamSelesai: Date | null;
@@ -421,7 +421,7 @@ function DosenBottomSection({ bottomData }: { bottomData: BottomData }) {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm max-w-xs truncate">
-                        {item.judulTugasAkhir || "-"}
+                        {item.judul || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {formatDate(item.tanggal)}

@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import DpTable from "./rnl-table";
-import { getAdminJadwal, type AdminJadwalData } from "@/lib/actions/detailJadwal/adminJadwal";
+import { getAdminJadwal, AdminDJ } from "@/lib/actions/detailJadwal/detailJadwal";
 
 export default function DaftarPenjadwalanClient() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<AdminJadwalData[]>([]);
-  const [filteredData, setFilteredData] = useState<AdminJadwalData[]>([]);
+  const [data, setData] = useState<AdminDJ[]>([]);
+  const [filteredData, setFilteredData] = useState<AdminDJ[]>([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;

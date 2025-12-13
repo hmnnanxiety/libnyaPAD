@@ -226,14 +226,17 @@ const FpTop = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label
-                htmlFor="jurusan"
+                htmlFor="judul"
                 className="text-sm font-medium text-gray-600"
               >
-                Jurusan
+                Dosen Pembimbing
               </Label>
               <Input
-                id="jurusan"
-                value="Teknologi Informasi"
+                id="dosenPembimbing"
+                value={
+                  userData.dosenPembimbing ||
+                  "Dosen pembimbing belum ditentukan"
+                }
                 disabled
                 className="bg-gray-50 cursor-not-allowed"
               />
@@ -265,29 +268,6 @@ const FpTop = () => {
                 disabled
                 className="bg-gray-50 cursor-not-allowed"
               />
-            </div>
-          </div>
-
-          {/* Dosen Pembimbing - Box Style */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-600">
-              Judul Tugas Akhir
-            </Label>
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-700">
-                {userData.dosenPembimbing ? (
-                  <>
-                    Dosen Pembimbing:{" "}
-                    <span className="font-medium">
-                      {userData.dosenPembimbing}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-gray-400 italic">
-                    Data dosen pembimbing belum tersedia
-                  </span>
-                )}
-              </p>
             </div>
           </div>
         </CardContent>

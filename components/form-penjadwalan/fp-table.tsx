@@ -93,7 +93,7 @@ export default function PenjadwalanTable({ pengajuan }: PenjadwalanTableProps) {
       <div className="space-y-4">
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-blue-50">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                   Nama Mahasiswa

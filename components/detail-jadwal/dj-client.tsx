@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { detailJadwal, type DosenDJ, type MahasiswaDJ, type AdminDJ } from "@/lib/actions/detailJadwal/getDetailsUjianForAll";
+import { detailJadwal, type DosenDJ, type MahasiswaDJ, type AdminDJ } from "@/lib/actions/detailJadwal/detailJadwal";
 import DJAdminTable from "./dj-admintable";
 import DJDosenTable from "./dj-dosentable";
 import DJMhsTable from "./dj-mhstable";

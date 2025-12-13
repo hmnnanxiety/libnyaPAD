@@ -161,9 +161,15 @@ export function RiwayatUjianTable({ data }: RiwayatUjianTableProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                      Selesai
-                    </span>
+                    {item.completed ? (
+                      <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                        Selesai
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+                        Dijadwalkan
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))

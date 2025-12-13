@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { FileErrorModal } from "./fp-errormodal";
 
 // Komponen tombol terpisah untuk menampilkan status "pending"
 function SubmitButton({ hasFile, disabled }: { hasFile: boolean; disabled: boolean }) {
@@ -57,6 +58,10 @@ export default function FpBottom() {
   // State untuk Alert Dialog
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  
+  // State untuk File Error Modal
+  const [showFileErrorModal, setShowFileErrorModal] = useState(false);
+  const [fileErrorMessage, setFileErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadProfile() {
@@ -88,7 +93,6 @@ export default function FpBottom() {
 
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false);
-    // Redirect ke dashboard setelah dialog ditutup
     router.push("/dashboard");
   };
 
@@ -96,9 +100,37 @@ export default function FpBottom() {
     setShowErrorDialog(false);
   };
 
+  const handleFileErrorClose = () => {
+    setShowFileErrorModal(false);
+    setFileErrorMessage("");
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    
     if (file) {
+      // Validasi tipe file
+      if (file.type !== "application/pdf") {
+        setFileErrorMessage("File yang Anda upload bukan format PDF. Silakan upload file dengan format PDF.");
+        setShowFileErrorModal(true);
+        e.target.value = "";
+        setSelectedFile(null);
+        return;
+      }
+
+      // Validasi ukuran file (10MB = 10 * 1024 * 1024 bytes)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        setFileErrorMessage(
+          `Ukuran file terlalu besar (${fileSizeMB} MB). Maksimal ukuran file adalah 10 MB. Silakan kompres atau pilih file yang lebih kecil.`
+        );
+        setShowFileErrorModal(true);
+        e.target.value = "";
+        setSelectedFile(null);
+        return;
+      }
+
       setSelectedFile(file);
     }
   };
@@ -118,6 +150,13 @@ export default function FpBottom() {
 
   return (
     <>
+      {/* File Error Modal */}
+      <FileErrorModal
+        isOpen={showFileErrorModal}
+        onClose={handleFileErrorClose}
+        errorMessage={fileErrorMessage}
+      />
+
       {/* Success Dialog */}
       <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <AlertDialogContent>
@@ -183,17 +222,17 @@ export default function FpBottom() {
               <input type="hidden" name="dosenPembimbingId" value={dosenPembimbingId} />
               <input type="hidden" name="dosenPembimbingName" value={dosenPembimbingName} />
 
-              {/* Jenis Ujian */}
+              {/* Judul Tugas Akhir */}
               <div className="space-y-2">
                 <Label htmlFor="judul" className="text-sm font-medium">
-                  Judul Ujian
+                  Judul Tugas Akhir
                 </Label>
                 <Input
                   id="judul"
                   name="judul"
                   type="text"
                   required
-                  placeholder="Masukkan judul ujian"
+                  placeholder="Masukkan Judul Tugas Akhir"
                   className="w-full"
                   disabled={disabledBecauseNoPembimbing}
                 />

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { EditDosenModal } from "./dd-editmodal";
-import { DeleteModal } from "../shared/dddm-deletemodal";
-import { deleteUser } from "@/lib/actions/profile/deleteUser";
+// import { DeleteModal } from "../shared/dddm-deletemodal"; modal delete
+// import { deleteUser } from "@/lib/actions/profile/deleteUser"; ku nonaktifin karena emang buat fitur hapus dosen belum ada, cuma buat nampilin modal doang
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -50,17 +50,17 @@ export function DosenTable({ dosen }: DosenTableProps) {
     setDeleteModalOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!selectedDosen) return;
+  // const confirmDelete = async () => {
+  //   if (!selectedDosen) return;
 
-    const result = await deleteUser(selectedDosen.id);
-    if (result.success) {
-      toast.success("Data dosen berhasil dihapus");
-      router.refresh();
-    } else {
-      toast.error(result.error || "Gagal menghapus data");
-    }
-  };
+  //   const result = await deleteUser(selectedDosen.id);
+  //   if (result.success) {
+  //     toast.success("Data dosen berhasil dihapus");
+  //     router.refresh();
+  //   } else {
+  //     toast.error(result.error || "Gagal menghapus data");
+  //   }
+  // };
 
   const getProdiLabel = (prodi: string | null) => {
     if (!prodi) return "-";
@@ -118,7 +118,7 @@ export function DosenTable({ dosen }: DosenTableProps) {
       <div className="space-y-4">
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-blue-50">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                   Nama Dosen
@@ -181,6 +181,7 @@ export function DosenTable({ dosen }: DosenTableProps) {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        {/* button delete */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -188,7 +189,7 @@ export function DosenTable({ dosen }: DosenTableProps) {
                           className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </Button> 
                       </div>
                     </td>
                   </tr>
@@ -257,13 +258,13 @@ export function DosenTable({ dosen }: DosenTableProps) {
         dosen={selectedDosen}
       />
 
-      <DeleteModal
+      {/* <DeleteModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={confirmDelete}
         userName={selectedDosen?.name || ""}
         userType="dosen"
-      />
+      /> */}
     </>
   );
 }

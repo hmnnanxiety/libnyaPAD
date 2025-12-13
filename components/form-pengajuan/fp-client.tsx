@@ -1,13 +1,18 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { submitBerkas, FormState } from "@/lib/actions/formPengajuan/uploadBerkasSupabase";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { useFormStatus } from "react-dom";
+import {
+  submitBerkas,
+  type FormState,
+} from "@/lib/actions/formPengajuan/uploadBerkasSupabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useFormStatus } from "react-dom";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle, FileUp, Loader2, XCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,40 +22,37 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { FileErrorModal } from "./fp-errormodal";
 
-interface UserProfile {
-  id: string;
-  name: string | null;
-  nim: string | null;
-  prodi: string | null;
-  departemen: string | null;
-  dosenPembimbing: string | null;
-  dosenPembimbingId: string | null;
-  judul?: string | null;
-}
-
-interface ProfileResult {
+interface ProfileData {
   success: boolean;
-  data?: UserProfile;
+  data?: {
+    dosenPembimbingId: string | null;
+    dosenPembimbing: string | null;
+  };
   error?: string;
 }
 
 interface FpClientProps {
-  profile: ProfileResult;
+  profile: ProfileData;
 }
 
-function SubmitButton() {
+// Komponen tombol terpisah untuk menampilkan status "pending"
+function SubmitButton({ hasFile, disabled }: { hasFile: boolean; disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+    <Button 
+      type="submit" 
+      disabled={pending || disabled || !hasFile} 
+      className="px-6"
+    >
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Mengunggah...
         </>
       ) : (
-        "Kirim Pengajuan"
+        "Submit"
       )}
     </Button>
   );
@@ -58,216 +60,238 @@ function SubmitButton() {
 
 export default function FpClient({ profile }: FpClientProps) {
   const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const initial: FormState = { success: false, message: "" };
-  const [state, formAction] = useActionState(submitBerkas, initial);
+  const initialState: FormState = { success: false, message: "" };
+  const [state, formAction] = useActionState(submitBerkas, initialState);
+  const [dosenPembimbingId, setDosenPembimbingId] = useState<string>("");
+  const [dosenPembimbingName, setDosenPembimbingName] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // State untuk Alert Dialog
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  
+  // State untuk File Error Modal
+  const [showFileErrorModal, setShowFileErrorModal] = useState(false);
+  const [fileErrorMessage, setFileErrorMessage] = useState("");
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState<"success" | "error">("success");
-  const [dialogMessage, setDialogMessage] = useState("");
+  // Set initial profile data
+  useEffect(() => {
+    if (profile.success && profile.data) {
+      setDosenPembimbingId(profile.data.dosenPembimbingId || "");
+      setDosenPembimbingName(profile.data.dosenPembimbing || "");
+    }
+  }, [profile]);
 
-  const [fileError, setFileError] = useState<string | null>(null);
-
+  // Handle success/error dari form submission
   useEffect(() => {
     if (state.message) {
-      setDialogType(state.success ? "success" : "error");
-      setDialogMessage(state.message);
-      setDialogOpen(true);
-
-      if (state.success && formRef.current) {
-        formRef.current.reset();
+      if (state.success) {
+        setShowSuccessDialog(true);
+      } else {
+        setShowErrorDialog(true);
       }
     }
   }, [state]);
 
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-    if (state.success) {
-      router.push("/dashboard");
-    }
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false);
+    router.push("/dashboard");
+  };
+
+  const handleErrorDialogClose = () => {
+    setShowErrorDialog(false);
+  };
+
+  const handleFileErrorClose = () => {
+    setShowFileErrorModal(false);
+    setFileErrorMessage("");
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    setFileError(null);
-
+    
     if (file) {
+      // Validasi tipe file
       if (file.type !== "application/pdf") {
-        setFileError("File harus berformat PDF.");
+        setFileErrorMessage("File yang Anda upload bukan format PDF. Silakan upload file dengan format PDF.");
+        setShowFileErrorModal(true);
         e.target.value = "";
+        setSelectedFile(null);
         return;
       }
+
+      // Validasi ukuran file (10MB = 10 * 1024 * 1024 bytes)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        setFileErrorMessage(
+          `Ukuran file terlalu besar (${fileSizeMB} MB). Maksimal ukuran file adalah 10 MB.`
+        );
+        setShowFileErrorModal(true);
+        e.target.value = "";
+        setSelectedFile(null);
+        return;
+      }
+
+      setSelectedFile(file);
     }
   };
 
-  // Error state: Profile tidak lengkap atau error lainnya
-  if (!profile.success) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-700">
-              <AlertTriangle className="h-5 w-5" />
-              Profil Tidak Lengkap
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-amber-700 mb-4">
-              {profile.error || "Profil Anda belum lengkap. Silakan lengkapi di halaman Profil sebelum melakukan pengajuan."}
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/profile")}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
-              Lengkapi Profil
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const userData = profile.data!;
+  // Check jika tidak ada dosen pembimbing
+  const disabledBecauseNoPembimbing = !dosenPembimbingId;
 
   return (
-    <div className="space-y-6">
-      {/* Profil Mahasiswa */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Data Mahasiswa</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Nama</Label>
-            <Input defaultValue={userData.name ?? "-"} disabled className="bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">NIM</Label>
-            <Input defaultValue={userData.nim ?? "-"} disabled className="bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Angkatan</Label>
-            <Input
-              defaultValue={userData.nim ? `20${userData.nim.slice(0, 2)}` : "-"}
-              disabled
-              className="bg-muted"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Program Studi</Label>
-            <Input defaultValue={userData.prodi ?? "-"} disabled className="bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Departemen</Label>
-            <Input defaultValue={userData.departemen ?? "-"} disabled className="bg-muted" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Dosen Pembimbing</Label>
-            <Input defaultValue={userData.dosenPembimbing ?? "-"} disabled className="bg-muted" />
-          </div>
-        </CardContent>
-      </Card>
+    <>
+      {/* File Error Modal */}
+      <FileErrorModal
+        isOpen={showFileErrorModal}
+        onClose={handleFileErrorClose}
+        errorMessage={fileErrorMessage}
+      />
 
-      {/* Form Pengajuan */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Form Pengajuan Ujian</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form ref={formRef} action={formAction} className="space-y-6">
-            <input
-                type="hidden"
-                name="dosenPembimbingId"
-                defaultValue={userData.dosenPembimbingId ?? ""}
-            />
-
-
-            <div className="space-y-2">
-              <Label htmlFor="judul">
-                Judul Tugas Akhir <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="judul"
-                name="judul"
-                placeholder="Masukkan judul tugas akhir Anda"
-                defaultValue={userData.judul ?? ""}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dosenPembimbing">Dosen Pembimbing</Label>
-              <Input
-                id="dosenPembimbing"
-                value={userData.dosenPembimbing ?? "-"}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                Dosen pembimbing dipilih otomatis berdasarkan data profil Anda.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="berkas">
-                Upload Berkas <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="berkas"
-                name="berkas"
-                type="file"
-                accept="application/pdf,.pdf"
-                required
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-              {fileError && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <XCircle className="h-4 w-4" />
-                  {fileError}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Format file: PDF. Pastikan berkas sudah lengkap sebelum diunggah.
-              </p>
-            </div>
-
-            <div className="pt-4">
-              <SubmitButton />
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Alert Dialog */}
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Success Dialog */}
+      <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {dialogType === "success" ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-green-700">Berhasil</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5 text-red-500" />
-                  <span className="text-red-700">Gagal</span>
-                </>
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              {dialogMessage}
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-green-100 rounded-full">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+              <AlertDialogTitle>Pengajuan Berhasil!</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
+              {state.message}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={handleDialogClose}>
-              {dialogType === "success" ? "Ke Dashboard" : "Tutup"}
+            <AlertDialogAction onClick={handleSuccessDialogClose} className="w-full sm:w-auto">
+              Kembali ke Dashboard
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+      {/* Error Dialog */}
+      <AlertDialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-red-100 rounded-full">
+                <XCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <AlertDialogTitle>Pengajuan Gagal</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
+              {state.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleErrorDialogClose} className="w-full sm:w-auto">
+              Coba Lagi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="w-full">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Upload Berkas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Alert jika tidak ada dosen pembimbing */}
+            {disabledBecauseNoPembimbing && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Informasi dosen pembimbing tidak tersedia. Silakan hubungi admin untuk menentukan dosen pembimbing sebelum melakukan pengajuan.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <form action={formAction} className="space-y-6">
+              {/* Hidden inputs */}
+              <input type="hidden" name="dosenPembimbingId" value={dosenPembimbingId} />
+              <input type="hidden" name="dosenPembimbingName" value={dosenPembimbingName} />
+
+              {/* Judul Tugas Akhir */}
+              <div className="space-y-2">
+                <Label htmlFor="judul" className="text-sm font-medium">
+                  Judul Tugas Akhir
+                </Label>
+                <Input
+                  id="judul"
+                  name="judul"
+                  type="text"
+                  required
+                  placeholder="Masukkan Judul Tugas Akhir"
+                  className="w-full"
+                  disabled={disabledBecauseNoPembimbing}
+                />
+              </div>
+
+              {/* Dosen Pembimbing */}
+              <div className="space-y-2">
+                <Label htmlFor="dosenPembimbingName" className="text-sm font-medium">
+                  Dosen Pembimbing
+                </Label>
+                <Input
+                  id="dosenPembimbingName"
+                  name="dosenPembimbingNameDisplay"
+                  value={dosenPembimbingName || "Tidak ada data"}
+                  disabled
+                  className="bg-gray-50 cursor-not-allowed"
+                  aria-readonly
+                />
+              </div>
+
+              {/* Upload Berkas */}
+              <div className="space-y-2">
+                <Label htmlFor="berkas" className="text-sm font-medium">
+                  Upload Berkas
+                </Label>
+                <div className="flex items-center gap-4">
+                  <label
+                    htmlFor="berkas"
+                    className={`flex items-center gap-2 px-4 py-3 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg transition-colors ${
+                      disabledBecauseNoPembimbing
+                        ? "cursor-not-allowed opacity-50"
+                        : "cursor-pointer hover:bg-blue-100"
+                    }`}
+                  >
+                    <FileUp className="w-5 h-5 text-blue-500" />
+                    <span className="text-sm text-blue-600 font-medium">
+                      {selectedFile ? selectedFile.name : "Upload Files"}
+                    </span>
+                  </label>
+                  {!selectedFile && <span className="text-sm text-gray-500">PDF (Max 10MB)</span>}
+                </div>
+                <Input
+                  id="berkas"
+                  name="berkas"
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  required
+                  onChange={handleFileChange}
+                  className="hidden"
+                  disabled={disabledBecauseNoPembimbing}
+                />
+                {selectedFile && (
+                  <p className="text-sm text-gray-600">
+                    File terpilih: <span className="font-medium">{selectedFile.name}</span>{" "}
+                    ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end pt-4">
+                <SubmitButton hasFile={!!selectedFile} disabled={disabledBecauseNoPembimbing} />
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Loader2, Save, AlertTriangle } from "lucide-react";
+import { Loader2, Save, AlertTriangle } from "lucide-react";
 import { updateProfile } from "@/lib/actions/profile/profile";
 import { useRouter } from "next/navigation";
 import {
@@ -141,10 +141,41 @@ export function ProfileClient({ user, dosenList = [] }: ProfileClientProps) {
           router.refresh();
         }, 2000);
       } else {
-        // Show more detailed error
+        // Show more detailed error with human-friendly messages
         if (result.fieldErrors) {
+          const fieldLabelMap: Record<string, string> = {
+            name: "Nama",
+            nim: "NIM",
+            prodi: "Program Studi",
+            telepon: "Nomor Telepon",
+            dosenPembimbingId: "Dosen Pembimbing",
+          };
+          
+          // Map error messages to human-friendly Indonesian
+          const errorTranslations: Record<string, string> = {
+            "Invalid input": "Format tidak valid",
+            "Required": "Wajib diisi",
+            "Nama tidak boleh kosong": "Nama tidak boleh kosong",
+            "Nama terlalu panjang": "Nama terlalu panjang (maksimal 100 karakter)",
+            "Format nomor telepon tidak valid": "Format nomor telepon tidak valid. Contoh: 08123456789",
+          };
+          
           const fieldErrorMsg = Object.entries(result.fieldErrors)
-            .map(([field, errors]) => `${field}: ${errors.join(", ")}`)
+            .map(([field, errors]) => {
+              const fieldLabel = fieldLabelMap[field] || field;
+              const errorMessages = Array.isArray(errors) ? errors : [errors];
+              
+              // Translate each error message with special handling for prodi
+              const translatedErrors = errorMessages.map(err => {
+                // Special case untuk prodi dropdown
+                if (field === "prodi" && (err === "Invalid input" || err === "Required")) {
+                  return "Silakan pilih program studi";
+                }
+                return errorTranslations[err] || err;
+              });
+              
+              return `${fieldLabel}: ${translatedErrors.join(", ")}`;
+            })
             .join("\n");
           setErrorMessage(fieldErrorMsg);
         } else {
@@ -372,7 +403,7 @@ export function ProfileClient({ user, dosenList = [] }: ProfileClientProps) {
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
             <DialogTitle className="text-center">Gagal!</DialogTitle>
-            <DialogDescription className="text-center">
+            <DialogDescription className="text-center whitespace-pre-line">
               {errorMessage}
             </DialogDescription>
           </DialogHeader>

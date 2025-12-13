@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { getUjianDetailsForAll } from "@/lib/actions/detailJadwal/getDetailsUjianForAll";
+import { getUjianDetailsForAll } from "@/lib/actions/detailJadwal/detailJadwal";
 
 interface BAModalProps {
   ujianId: string;
@@ -333,7 +333,7 @@ export default function BAModal({ ujianId, userRole, onClose }: BAModalProps) {
                   </div>
                 )}
 
-              {/* Catatan - Only for MAHASISWA */}
+              {/* Catatan - Only for MAHASISWA
               {userRole === "MAHASISWA" && (
                 <Alert className="bg-amber-50 border-amber-200">
                   <AlertCircle className="h-5 w-5 text-amber-600" />
@@ -347,7 +347,7 @@ export default function BAModal({ ujianId, userRole, onClose }: BAModalProps) {
                     </p>
                   </AlertDescription>
                 </Alert>
-              )}
+              )} */}
 
               {/* Info Admin - Only for ADMIN */}
               {userRole === "ADMIN" && (

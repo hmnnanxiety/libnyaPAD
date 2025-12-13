@@ -50,7 +50,6 @@ export function EditDosenModal({
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    nim: "",
     prodi: "",
     departemen: "",
     telepon: "",
@@ -60,7 +59,6 @@ export function EditDosenModal({
     if (dosen) {
       setFormData({
         name: dosen.name || "",
-        nim: dosen.nim || "",
         prodi: dosen.prodi || "",
         departemen: dosen.departemen || "Departemen Teknik Elektro dan Informatika",
         telepon: dosen.telepon || "",
@@ -76,6 +74,7 @@ export function EditDosenModal({
     try {
       const formDataObj = new FormData();
       formDataObj.append("name", formData.name);
+      formDataObj.append("prodi", formData.prodi);
       formDataObj.append("departemen", formData.departemen);
       formDataObj.append("telepon", formData.telepon);
 
@@ -143,7 +142,7 @@ export function EditDosenModal({
               <Label htmlFor="nim">NIP</Label>
               <Input
                 id="nim"
-                value={formData.nim}
+                value={dosen.nim || "-"}
                 disabled
                 className="bg-gray-50"
               />
@@ -156,20 +155,13 @@ export function EditDosenModal({
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                value={dosen.email || ""}
+                value={dosen.email || "-"}
                 disabled
                 className="bg-gray-50"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Input
-                id="role"
-                value="Dosen"
-                disabled
-                className="bg-gray-50"
-              />
+              <p className="text-xs text-gray-500">
+                Email tidak dapat diubah
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -179,9 +171,8 @@ export function EditDosenModal({
                 onValueChange={(value) =>
                   setFormData({ ...formData, prodi: value })
                 }
-                disabled
               >
-                <SelectTrigger className="bg-gray-50">
+                <SelectTrigger>
                   <SelectValue placeholder="Pilih program studi" />
                 </SelectTrigger>
                 <SelectContent>
@@ -199,9 +190,18 @@ export function EditDosenModal({
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500">
-                Program studi tidak dapat diubah
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="telepon">No. Telepon</Label>
+              <Input
+                id="telepon"
+                value={formData.telepon}
+                onChange={(e) =>
+                  setFormData({ ...formData, telepon: e.target.value })
+                }
+                placeholder="08xxxxxxxxxx"
+              />
             </div>
 
             <div className="space-y-2 sm:col-span-2">
@@ -213,18 +213,6 @@ export function EditDosenModal({
                   setFormData({ ...formData, departemen: e.target.value })
                 }
                 placeholder="Departemen Teknik Elektro dan Informatika"
-              />
-            </div>
-
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="telepon">No. Telepon</Label>
-              <Input
-                id="telepon"
-                value={formData.telepon}
-                onChange={(e) =>
-                  setFormData({ ...formData, telepon: e.target.value })
-                }
-                placeholder="08xxxxxxxxxx"
               />
             </div>
           </div>

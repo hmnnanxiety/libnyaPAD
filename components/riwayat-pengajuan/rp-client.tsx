@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -11,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bell, Loader2, Search } from "lucide-react";
+import { Bell, Calendar, Loader2 } from "lucide-react";
 import { TimelineItem } from "./rp-timelineItem";
 import { getNotifications } from "@/lib/actions/notifikasi/notifications";
 
@@ -48,12 +47,14 @@ export function RiwayatPengajuanClient({
 }: RiwayatPengajuanClientProps) {
   const [notifications, setNotifications] = useState<Notification[]>(initialData);
   const [selectedFilter, setSelectedFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(initialPagination?.page || 1);
   const [hasMore, setHasMore] = useState(initialPagination?.hasMore || false);
 
-  // Filter and search notifications
+  // Dynamic page title based on role
+  const pageTitle = userRole === "DOSEN" ? "Notifikasi" : "Riwayat Pengajuan";
+
+  // Filter notifications
   const filteredNotifications = notifications.filter((notif) => {
     // Apply status filter
     if (selectedFilter !== "all") {
@@ -84,17 +85,6 @@ export function RiwayatPengajuanClient({
       }
 
       if (!matchesFilter) return false;
-    }
-
-    // Apply search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        notif.message.toLowerCase().includes(query) ||
-        notif.ujian.judul.toLowerCase().includes(query) ||
-        notif.ujian.mahasiswa.name?.toLowerCase().includes(query);
-
-      return matchesSearch;
     }
 
     return true;
@@ -148,25 +138,13 @@ export function RiwayatPengajuanClient({
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header with Title and Filters */}
+      {/* Header with Title and Filter */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Riwayat Pengajuan</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{pageTitle}</h1>
 
-        {/* Search and Filter Controls */}
-        <div className="flex items-center gap-3">
-          {/* Search Input */}
-          <div className="relative w-full md:w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Cari notifikasi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Filter Status */}
+        {/* Filter Control */}
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedFilter} onValueChange={setSelectedFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Semua Status" />
@@ -189,12 +167,10 @@ export function RiwayatPengajuanClient({
             <div className="text-center py-12">
               <Bell className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <p className="text-muted-foreground text-lg mb-2">
-                {searchQuery ? "Tidak ada notifikasi yang cocok" : emptyState.title}
+                {emptyState.title}
               </p>
               <p className="text-sm text-muted-foreground">
-                {searchQuery
-                  ? "Coba gunakan kata kunci yang berbeda"
-                  : emptyState.subtitle}
+                {emptyState.subtitle}
               </p>
             </div>
           ) : (
