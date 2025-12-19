@@ -34,10 +34,10 @@ interface PaginationParams {
   month?: number;
   year?: number;
   peran?: "semua" | "pembimbing" | "penguji";
+  status?: "semua" | "selesai" | "dijadwalkan";
 }
 
 // Auto update ujian DIJADWALKAN → SELESAI kalau sudah lewat
-
 async function updateExpiredExams() {
   try {
     const now = new Date();
@@ -83,7 +83,14 @@ export async function riwayatUjian(params: PaginationParams = {}) {
   try {
     await updateExpiredExams();
 
-    const { page = 1, limit = 10, month, year, peran = "semua" } = params;
+    const { 
+      page = 1, 
+      limit = 10, 
+      month, 
+      year, 
+      peran = "semua",
+      status = "semua" 
+    } = params;
     const skip = (page - 1) * limit;
 
     const userId = session.user.id;
@@ -101,6 +108,15 @@ export async function riwayatUjian(params: PaginationParams = {}) {
       };
     }
 
+    // Status filter
+    const statusCondition: Partial<Pick<Prisma.UjianWhereInput, 'status'>> = {};
+    if (status === "selesai") {
+      statusCondition.status = StatusUjian.SELESAI;
+    } else if (status === "dijadwalkan") {
+      statusCondition.status = StatusUjian.DIJADWALKAN;
+    }
+    // If "semua", no status filter is applied
+
     // ====================
     //       DOSEN
     // ====================
@@ -110,14 +126,22 @@ export async function riwayatUjian(params: PaginationParams = {}) {
           { dosenPembimbingId: userId },
           { dosenPenguji: { some: { dosenId: userId } } },
         ],
-        status: StatusUjian.SELESAI,
+        ...statusCondition,
         ...dateFilter,
       };
 
       if (peran === "pembimbing") {
-        whereClause = { dosenPembimbingId: userId, status: StatusUjian.SELESAI, ...dateFilter };
+        whereClause = { 
+          dosenPembimbingId: userId, 
+          ...statusCondition,
+          ...dateFilter 
+        };
       } else if (peran === "penguji") {
-        whereClause = { dosenPenguji: { some: { dosenId: userId } }, status: StatusUjian.SELESAI, ...dateFilter };
+        whereClause = { 
+          dosenPenguji: { some: { dosenId: userId } }, 
+          ...statusCondition,
+          ...dateFilter 
+        };
       }
 
       const totalCount = await prisma.ujian.count({ where: whereClause });
@@ -130,6 +154,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
           judul: true,
           tanggalUjian: true,
           dosenPembimbingId: true,
+          status: true,
         },
         orderBy: { tanggalUjian: "desc" },
         skip,
@@ -144,7 +169,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
         judulTugasAkhir: item.judul,
         tanggal: item.tanggalUjian?.toISOString() || null,
         isDosenPembimbing: item.dosenPembimbingId === userId,
-        completed: true,
+        completed: item.status === StatusUjian.SELESAI,
       }));
 
       return {
@@ -165,7 +190,7 @@ export async function riwayatUjian(params: PaginationParams = {}) {
     // ====================
     if (role === "ADMIN") {
       const whereClause: Prisma.UjianWhereInput = {
-        status: StatusUjian.SELESAI,
+        ...statusCondition,
         ...dateFilter,
       };
 

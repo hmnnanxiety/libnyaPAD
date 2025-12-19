@@ -523,9 +523,16 @@ export async function assignUjian(formData: FormData) {
       };
     }
 
+    if (!ujian.dosenPembimbing) {
+      return {
+        success: false,
+        error: "Dosen pembimbing belum ditentukan untuk ujian ini",
+      };
+    }
+
     if (
-      data.dosenPenguji1Id === ujian.dosenPembimbingId ||
-      data.dosenPenguji2Id === ujian.dosenPembimbingId
+      data.dosenPenguji1Id === ujian.dosenPembimbing.id ||
+      data.dosenPenguji2Id === ujian.dosenPembimbing.id
     ) {
       return {
         success: false,
@@ -584,7 +591,7 @@ export async function assignUjian(formData: FormData) {
       ruanganAvailabilityCheck.data?.available.map((r) => r.id) || []
     );
 
-    if (!availableDosenIds.has(ujian.dosenPembimbingId)) {
+    if (!availableDosenIds.has(ujian.dosenPembimbing.id)) {
       return {
         success: false,
         error: `Dosen pembimbing ${ujian.dosenPembimbing.name} sudah memiliki jadwal ujian pada waktu tersebut`,
@@ -772,7 +779,7 @@ export async function assignUjian(formData: FormData) {
       });
 
       notifications.push({
-        userId: ujian.dosenPembimbingId,
+        userId: ujian.dosenPembimbing.id,
         ujianId: data.ujianId,
         message: formatNotificationMessage(
           `Pengajuan oleh ${
@@ -814,7 +821,7 @@ export async function assignUjian(formData: FormData) {
       });
 
       notifications.push({
-        userId: ujian.dosenPembimbingId,
+        userId: ujian.dosenPembimbing.id,
         ujianId: data.ujianId,
         message: formatNotificationMessage(
           `Jadwal ujian ${
@@ -883,6 +890,89 @@ export async function assignUjian(formData: FormData) {
     return {
       success: false,
       error: "Terjadi kesalahan saat menjadwalkan ujian",
+    };
+  }
+}
+
+export async function getDosenPembimbingSchedule(mahasiswaId: string) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return {
+        success: false,
+        error: "Akses ditolak",
+      };
+    }
+
+    const ujian = await prisma.ujian.findFirst({
+      where: {
+        mahasiswaId,
+        status: "DITERIMA",
+      },
+      select: {
+        dosenPembimbingId: true,
+        dosenPembimbing: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!ujian || !ujian.dosenPembimbingId) {
+      return {
+        success: false,
+        error: "Dosen pembimbing tidak ditemukan untuk mahasiswa ini",
+      };
+    }
+
+    const now = new Date();
+
+    const schedules = await prisma.ujian.findMany({
+      where: {
+        dosenPembimbingId: ujian.dosenPembimbingId,
+        status: "DIJADWALKAN",
+        tanggalUjian: {
+          gt: now,
+        },
+      },
+      select: {
+        id: true,
+        judul: true,
+        tanggalUjian: true,
+        jamMulai: true,
+        jamSelesai: true,
+        ruangan: {
+          select: {
+            nama: true,
+          },
+        },
+        mahasiswa: {
+          select: {
+            name: true,
+            nim: true,
+          },
+        },
+      },
+      orderBy: {
+        tanggalUjian: "asc",
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        dosen: ujian.dosenPembimbing,
+        schedules,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting dosen pembimbing schedule:", error);
+    return {
+      success: false,
+      error: "Terjadi kesalahan saat mengambil jadwal dosen pembimbing",
     };
   }
 }

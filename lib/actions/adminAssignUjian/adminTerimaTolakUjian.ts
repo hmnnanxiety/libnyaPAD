@@ -88,7 +88,9 @@ export async function acceptUjian(ujianId: string) {
 
     const ujian = await prisma.ujian.findUnique({
       where: { id: ujianId },
-      include: {
+      select: {
+        mahasiswaId: true,
+        dosenPembimbingId: true,
         mahasiswa: {
           select: {
             name: true,
@@ -101,6 +103,13 @@ export async function acceptUjian(ujianId: string) {
       return {
         success: false,
         error: "Ujian tidak ditemukan",
+      };
+    }
+
+    if (!ujian.dosenPembimbingId) {
+      return {
+        success: false,
+        error: "Dosen pembimbing belum ditentukan untuk ujian ini",
       };
     }
 

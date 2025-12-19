@@ -59,6 +59,8 @@ export interface FilterOptions {
 
 /* ============================
    1. DETAIL JADWAL (LIST) - ALL ROLES
+   Purpose: Menampilkan jadwal ujian yang AKAN DATANG
+   Status: DIJADWALKAN dengan tanggalUjian >= today
 ============================= */
 
 export async function detailJadwal(filters?: FilterOptions) {
@@ -90,10 +92,20 @@ export async function detailJadwal(filters?: FilterOptions) {
          ADMIN
       ====================== */
       case "ADMIN": {
+        // Get current date at start of today (00:00:00)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const whereClause: any = { status: "DIJADWALKAN" };
+        const whereClause: any = { 
+          status: "DIJADWALKAN",
+          tanggalUjian: {
+            gte: today, // Hanya ambil ujian yang akan datang (hari ini dan kedepan)
+          },
+        };
 
         if (filters?.startDate || filters?.endDate) {
+          // Override tanggalUjian filter jika ada custom date range filter
           whereClause.tanggalUjian = {};
           if (filters.startDate)
             whereClause.tanggalUjian.gte = filters.startDate;
@@ -299,6 +311,8 @@ export async function detailJadwal(filters?: FilterOptions) {
 
 /* ============================
    2. GET ADMIN JADWAL (ADMIN ONLY)
+   Purpose: Menampilkan RIWAYAT ujian yang SUDAH SELESAI
+   Status: SELESAI (sudah di-auto-update oleh system)
 ============================= */
 
 export async function getAdminJadwal(filters?: FilterOptions) {
@@ -321,7 +335,7 @@ export async function getAdminJadwal(filters?: FilterOptions) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const whereClause: any = {
-      status: "DIJADWALKAN",
+      status: "SELESAI", // Tampilkan ujian yang sudah selesai untuk RIWAYAT
     };
 
     if (filters?.startDate || filters?.endDate) {
@@ -390,7 +404,7 @@ export async function getAdminJadwal(filters?: FilterOptions) {
         },
       },
       orderBy: {
-        tanggalUjian: "asc",
+        tanggalUjian: "desc", // Terbaru dulu untuk riwayat
       },
     });
 
